@@ -31,7 +31,7 @@ export default function Home() {
             </div>
             <div className="ml-auto flex gap-2">
               <a
-                href="https://github.com"
+                href="https://github.com/DianaLeoTang/markdown-card"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center text-sm font-medium hover:underline"
