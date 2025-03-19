@@ -1,0 +1,16 @@
+[build]
+  command = "bun run build"
+  publish = "dist"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[images]
+  remote_images = [
+    "https://images.unsplash.com/**"
+  ]
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
