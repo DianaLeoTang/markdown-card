@@ -8,12 +8,21 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import * as htmlToImage from "html-to-image";
 import { useMarkdown } from "@/contexts/MarkdownContext";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 export default function PreviewSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'svg'>('png');
   const cardRef = useRef<HTMLDivElement>(null);
-  const { markdown, cardOptions } = useMarkdown();
+  const {
+    markdown,
+    cardOptions,
+    cards,
+    currentCardIndex,
+    setCurrentCardIndex,
+    totalCards
+  } = useMarkdown();
 
   const getThemeStyles = () => {
     switch (cardOptions.theme) {
@@ -81,75 +90,6 @@ export default function PreviewSection() {
     }
   };
 
-  const getCardStyles = () => {
-    const theme = getThemeStyles();
-    const border = getBorderStyles();
-    const corners = getCornerStyles();
-    return `${theme} ${border} ${corners} p-8 shadow-md overflow-hidden transition-all`;
-  };
-
-  const exportAsImage = async (format: 'png' | 'jpeg' | 'svg' = exportFormat) => {
-    if (!cardRef.current) return;
-
-    setIsLoading(true);
-    try {
-      let dataUrl;
-
-      switch (format) {
-        case 'png':
-          dataUrl = await htmlToImage.toPng(cardRef.current);
-          break;
-        case 'jpeg':
-          dataUrl = await htmlToImage.toJpeg(cardRef.current);
-          break;
-        case 'svg':
-          dataUrl = await htmlToImage.toSvg(cardRef.current);
-          break;
-        default:
-          dataUrl = await htmlToImage.toPng(cardRef.current);
-      }
-
-      const link = document.createElement('a');
-      link.download = `markdown-card.${format}`;
-      link.href = dataUrl;
-      link.click();
-    } catch (error) {
-      console.error('Error exporting image:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Parse frontmatter from markdown (basic implementation)
-  const extractFrontmatter = (markdownText: string) => {
-    const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
-    const match = markdownText.match(frontmatterRegex);
-
-    if (match && match[1]) {
-      const frontmatter: Record<string, string> = {};
-      const lines = match[1].split('\n');
-
-      lines.forEach(line => {
-        const [key, ...valueParts] = line.split(':');
-        if (key && valueParts.length) {
-          frontmatter[key.trim()] = valueParts.join(':').trim();
-        }
-      });
-
-      return {
-        frontmatter,
-        content: markdownText.replace(frontmatterRegex, '')
-      };
-    }
-
-    return {
-      frontmatter: {},
-      content: markdownText
-    };
-  };
-
-  const { frontmatter, content } = extractFrontmatter(markdown);
-
   const getTagStyles = () => {
     switch (cardOptions.theme) {
       case 'dark':
@@ -171,6 +111,142 @@ export default function PreviewSection() {
     }
   };
 
+  const getCardStyles = () => {
+    const theme = getThemeStyles();
+    const border = getBorderStyles();
+    const corners = getCornerStyles();
+    return `${theme} ${border} ${corners} p-8 shadow-md overflow-hidden transition-all`;
+  };
+
+  const exportCurrentCardAsImage = async (format: 'png' | 'jpeg' | 'svg' = exportFormat) => {
+    if (!cardRef.current) return;
+
+    setIsLoading(true);
+    try {
+      let dataUrl;
+
+      switch (format) {
+        case 'png':
+          dataUrl = await htmlToImage.toPng(cardRef.current);
+          break;
+        case 'jpeg':
+          dataUrl = await htmlToImage.toJpeg(cardRef.current);
+          break;
+        case 'svg':
+          dataUrl = await htmlToImage.toSvg(cardRef.current);
+          break;
+        default:
+          dataUrl = await htmlToImage.toPng(cardRef.current);
+      }
+
+      const link = document.createElement('a');
+      link.download = `markdown-card-${currentCardIndex + 1}.${format}`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Error exporting image:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Export a single card and return the data URL
+  const generateCardImage = async (cardIndex: number, format: 'png' | 'jpeg' | 'svg'): Promise<string> => {
+    if (!cardRef.current) return '';
+
+    // Save the current card index
+    const previousIndex = currentCardIndex;
+
+    try {
+      // Switch to the card we want to export
+      setCurrentCardIndex(cardIndex);
+
+      // Wait for the UI to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Generate the image
+      let dataUrl;
+      switch (format) {
+        case 'png':
+          dataUrl = await htmlToImage.toPng(cardRef.current);
+          break;
+        case 'jpeg':
+          dataUrl = await htmlToImage.toJpeg(cardRef.current);
+          break;
+        case 'svg':
+          dataUrl = await htmlToImage.toSvg(cardRef.current);
+          break;
+        default:
+          dataUrl = await htmlToImage.toPng(cardRef.current);
+      }
+
+      return dataUrl;
+    } catch (error) {
+      console.error(`Error generating image for card ${cardIndex + 1}:`, error);
+      return '';
+    } finally {
+      // Restore the previous card index
+      setCurrentCardIndex(previousIndex);
+    }
+  };
+
+  // Export all cards as a zip file
+  const exportAllCards = async (format: 'png' | 'jpeg' | 'svg' = exportFormat) => {
+    if (!cardRef.current || cards.length === 0) return;
+
+    setIsLoading(true);
+
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder("markdown-cards");
+
+      // First capture the current card
+      const currentCardDataUrl = await htmlToImage.toPng(cardRef.current);
+      folder?.file(`card-${currentCardIndex + 1}.${format}`, currentCardDataUrl.split(',')[1], {base64: true});
+
+      // Then capture all other cards
+      for (let i = 0; i < cards.length; i++) {
+        if (i !== currentCardIndex) {
+          // Switch to this card and capture it
+          setCurrentCardIndex(i);
+
+          // Wait for the UI to update
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          let dataUrl;
+          switch (format) {
+            case 'png':
+              dataUrl = await htmlToImage.toPng(cardRef.current);
+              break;
+            case 'jpeg':
+              dataUrl = await htmlToImage.toJpeg(cardRef.current);
+              break;
+            case 'svg':
+              dataUrl = await htmlToImage.toSvg(cardRef.current);
+              break;
+            default:
+              dataUrl = await htmlToImage.toPng(cardRef.current);
+          }
+
+          // Add to zip
+          if (dataUrl) {
+            const base64Data = dataUrl.split(',')[1];
+            folder?.file(`card-${i + 1}.${format}`, base64Data, {base64: true});
+          }
+        }
+      }
+
+      // Generate and download the zip
+      const content = await zip.generateAsync({type: 'blob'});
+      saveAs(content, `markdown-cards.zip`);
+
+    } catch (error) {
+      console.error('Error exporting all cards:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleFormatChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const format = e.target.value;
     if (format === 'png' || format === 'jpeg' || format === 'svg') {
@@ -178,9 +254,37 @@ export default function PreviewSection() {
     }
   };
 
+  // Get the current card data
+  const currentCard = cards[currentCardIndex] || { content: '', frontmatter: {} };
+
   return (
     <div className="space-y-6">
-      <div className="overflow-auto pb-4">
+      {/* Card navigation if there are multiple cards */}
+      {totalCards > 1 && (
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentCardIndex(Math.max(0, currentCardIndex - 1))}
+            disabled={currentCardIndex === 0}
+          >
+            Previous Card
+          </Button>
+          <span className="text-sm">
+            Card {currentCardIndex + 1} of {totalCards}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentCardIndex(Math.min(totalCards - 1, currentCardIndex + 1))}
+            disabled={currentCardIndex === totalCards - 1}
+          >
+            Next Card
+          </Button>
+        </div>
+      )}
+
+      <div className="pb-4 overflow-auto">
         <div
           ref={cardRef}
           className={getCardStyles()}
@@ -190,14 +294,14 @@ export default function PreviewSection() {
             margin: '0 auto'
           }}
         >
-          {frontmatter.title && (
+          {currentCard.frontmatter.title && (
             <div className="mb-4">
               <h1 className={`text-2xl font-bold ${cardOptions.theme === 'terminal' ? 'font-mono' : ''}`}>
-                {frontmatter.title}
+                {currentCard.frontmatter.title}
               </h1>
-              {frontmatter.description && (
+              {currentCard.frontmatter.description && (
                 <p className={`text-sm opacity-80 mt-1 ${cardOptions.theme === 'terminal' ? 'font-mono' : ''}`}>
-                  {frontmatter.description}
+                  {currentCard.frontmatter.description}
                 </p>
               )}
             </div>
@@ -208,13 +312,13 @@ export default function PreviewSection() {
               rehypePlugins={[rehypeRaw]}
               remarkPlugins={[remarkGfm]}
             >
-              {content}
+              {currentCard.content}
             </ReactMarkdown>
           </div>
 
-          {frontmatter.tags && (
-            <div className="mt-4 flex flex-wrap gap-1">
-              {frontmatter.tags.split(',').map((tag, i) => (
+          {currentCard.frontmatter.tags && (
+            <div className="flex flex-wrap gap-1 mt-4">
+              {currentCard.frontmatter.tags.split(',').map((tag, i) => (
                 <span
                   key={i}
                   className={`${getTagStyles()} text-xs px-2 py-1 rounded`}
@@ -225,9 +329,9 @@ export default function PreviewSection() {
             </div>
           )}
 
-          {frontmatter.date && (
+          {currentCard.frontmatter.date && (
             <div className={`mt-4 text-sm opacity-70 ${cardOptions.theme === 'terminal' ? 'font-mono' : ''}`}>
-              {frontmatter.date}
+              {currentCard.frontmatter.date}
             </div>
           )}
         </div>
@@ -235,9 +339,9 @@ export default function PreviewSection() {
 
       <div className="space-y-4">
         {/* Export format selection on mobile */}
-        <div className="md:hidden">
+        <div className="space-y-2 md:hidden">
           <select
-            className="w-full flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+            className="flex w-full px-3 py-1 text-sm transition-colors bg-transparent border rounded-md shadow-sm h-9 border-input"
             value={exportFormat}
             onChange={handleFormatChange}
           >
@@ -246,39 +350,60 @@ export default function PreviewSection() {
             <option value="svg">SVG Format</option>
           </select>
           <Button
-            onClick={() => exportAsImage()}
+            onClick={() => exportCurrentCardAsImage()}
             disabled={isLoading}
-            className="w-full mt-2"
+            className="w-full"
           >
-            {isLoading ? 'Exporting...' : `Export as ${exportFormat.toUpperCase()}`}
+            {isLoading ? 'Exporting...' : `Export Current Card`}
           </Button>
+          {totalCards > 1 && (
+            <Button
+              onClick={() => exportAllCards()}
+              disabled={isLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {isLoading ? 'Exporting...' : `Export All ${totalCards} Cards`}
+            </Button>
+          )}
         </div>
 
         {/* Desktop export buttons */}
-        <div className="hidden md:flex flex-wrap justify-center gap-3">
+        <div className="flex-wrap justify-center hidden gap-3 md:flex">
           <Button
-            onClick={() => exportAsImage('png')}
+            onClick={() => exportCurrentCardAsImage('png')}
             disabled={isLoading}
             className="min-w-[120px]"
           >
-            {isLoading && exportFormat === 'png' ? 'Exporting...' : 'Export as PNG'}
+            {isLoading ? 'Exporting...' : 'Export Current as PNG'}
           </Button>
           <Button
-            onClick={() => exportAsImage('jpeg')}
-            disabled={isLoading}
-            variant="outline"
-            className="min-w-[120px]"
-          >
-            {isLoading && exportFormat === 'jpeg' ? 'Exporting...' : 'Export as JPEG'}
-          </Button>
-          <Button
-            onClick={() => exportAsImage('svg')}
+            onClick={() => exportCurrentCardAsImage('jpeg')}
             disabled={isLoading}
             variant="outline"
             className="min-w-[120px]"
           >
-            {isLoading && exportFormat === 'svg' ? 'Exporting...' : 'Export as SVG'}
+            Export as JPEG
           </Button>
+          <Button
+            onClick={() => exportCurrentCardAsImage('svg')}
+            disabled={isLoading}
+            variant="outline"
+            className="min-w-[120px]"
+          >
+            Export as SVG
+          </Button>
+
+          {totalCards > 1 && (
+            <Button
+              onClick={() => exportAllCards(exportFormat)}
+              disabled={isLoading}
+              variant="default"
+              className="min-w-[120px] mt-2 ml-auto mr-auto"
+            >
+              {isLoading ? 'Creating Zip...' : `Export All ${totalCards} Cards`}
+            </Button>
+          )}
         </div>
       </div>
     </div>

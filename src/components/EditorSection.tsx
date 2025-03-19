@@ -16,7 +16,8 @@ export default function EditorSection() {
     setMarkdown,
     cardOptions,
     setCardOptions,
-    resetToDefault
+    resetToDefault,
+    totalCards
   } = useMarkdown();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -35,13 +36,20 @@ export default function EditorSection() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* Editor Panel */}
       <div>
         <Card>
           <CardContent className="p-4">
             <div className="mb-4">
-              <Label htmlFor="markdown-editor">Markdown Content</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="markdown-editor">Markdown Content</Label>
+                {totalCards > 1 && (
+                  <span className="text-sm font-medium text-primary">
+                    {totalCards} cards detected
+                  </span>
+                )}
+              </div>
               <Textarea
                 id="markdown-editor"
                 ref={textareaRef}
@@ -51,7 +59,7 @@ export default function EditorSection() {
                 placeholder="Enter your markdown here..."
               />
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-center justify-between">
               <Button
                 variant="outline"
                 onClick={resetToDefault}
@@ -60,13 +68,24 @@ export default function EditorSection() {
               >
                 Reset to Sample
               </Button>
-              <Button
-                onClick={handleCopyMarkdown}
-                size="sm"
-                className="text-xs md:text-sm"
-              >
-                {copySuccess ? "Copied!" : "Copy Markdown"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {totalCards > 1 ? (
+                  <div className="text-sm text-muted-foreground">
+                    Use <code>---</code> to split content into multiple cards
+                  </div>
+                ) : (
+                  <div className="hidden text-sm text-muted-foreground md:block">
+                    Add <code>---</code> to create multiple cards
+                  </div>
+                )}
+                <Button
+                  onClick={handleCopyMarkdown}
+                  size="sm"
+                  className="text-xs md:text-sm"
+                >
+                  {copySuccess ? "Copied!" : "Copy Markdown"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -76,14 +95,14 @@ export default function EditorSection() {
       <div>
         <Card>
           <CardContent className="p-4">
-            <h3 className="text-lg font-semibold mb-4">Card Options</h3>
+            <h3 className="mb-4 text-lg font-semibold">Card Options</h3>
 
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="theme">Theme</Label>
                 <select
                   id="theme"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full px-3 py-1 text-sm transition-colors bg-transparent border rounded-md shadow-sm h-9 border-input placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   value={cardOptions.theme}
                   onChange={(e) => setCardOptions({ theme: e.target.value })}
                 >
@@ -147,6 +166,17 @@ export default function EditorSection() {
                   onCheckedChange={(checked) => setCardOptions({ showBorder: checked })}
                 />
               </div>
+
+              {totalCards > 1 && (
+                <div className="p-3 mt-4 rounded-md bg-muted/50">
+                  <h4 className="mb-1 text-sm font-medium">Multiple Cards Mode</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Your markdown contains {totalCards} cards separated by <code>---</code> dividers.
+                    Use the navigation in the Preview tab to view each card.
+                    All cards can be exported together with the "Export All Cards" button.
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
