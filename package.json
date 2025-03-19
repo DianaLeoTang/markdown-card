@@ -11,6 +11,7 @@
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dom-to-image": "^2.6.0",
     "file-saver": "^2.0.5",
     "html-to-image": "^1.11.13",
     "install": "^0.13.0",
