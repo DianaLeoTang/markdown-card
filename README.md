@@ -1,4 +1,5 @@
 
+
 # Markdown Card 
 
 A modern web application that converts Markdown to beautiful knowledge cards and social media images.
@@ -28,13 +29,22 @@ To run this project locally:
 ```bash
 # Clone the repository
 git clone https://github.com/DianaLeoTang/markdown-card.git
-cd markdown-card-creator
-
-# Install dependencies
+cd markdown-card
+```
+```bash
+# Install dependencies选一个命令执行即可
 bun install
+yarn install
+npm install
+pnpm install
+```
 
-# Start development server
+```bash
+# Start development server选一个命令执行即可
 bun run dev
+yarn dev
+npm run dev
+pnpm run dev
 ```
 
 ## Usage
