@@ -32,7 +32,8 @@ git clone https://github.com/DianaLeoTang/markdown-card.git
 cd markdown-card
 ```
 ```bash
-# Install dependencies选一个命令执行即可
+# Install dependencies
+# Choose one command to run
 bun install
 yarn install
 npm install
@@ -40,7 +41,8 @@ pnpm install
 ```
 
 ```bash
-# Start development server选一个命令执行即可
+# Start development server
+# Choose one command to run
 bun run dev
 yarn dev
 npm run dev
